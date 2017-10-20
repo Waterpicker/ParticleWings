@@ -1,5 +1,6 @@
 package org.waterpicker.particlewings;
 
+import com.codehusky.huskyui.StateContainer;
 import com.google.common.collect.Lists;
 import com.google.common.reflect.TypeToken;
 import com.google.inject.Inject;
@@ -11,6 +12,7 @@ import org.slf4j.Logger;
 import org.spongepowered.api.Sponge;
 import org.spongepowered.api.command.CommandResult;
 import org.spongepowered.api.command.args.GenericArguments;
+import org.spongepowered.api.command.spec.CommandExecutor;
 import org.spongepowered.api.command.spec.CommandSpec;
 import org.spongepowered.api.config.ConfigDir;
 import org.spongepowered.api.config.DefaultConfig;
@@ -43,8 +45,7 @@ public class ParticleWings {
     @Inject
     private Logger logger;
 
-    @Inject
-    private PluginContainer container;
+    private static PluginContainer container;
 
     private Map<UUID, WingEffect> effects = new HashMap<>();
 
@@ -58,72 +59,98 @@ public class ParticleWings {
 
     public static ConfigManager<Config> manager;
 
+    @Inject
+    public ParticleWings(PluginContainer container) {
+        ParticleWings.container = container;
+    }
+
     @Listener
     public void onPreInit(GamePreInitializationEvent event) {
-        try (DirectoryStream<Path> stream = Files.newDirectoryStream(dir.resolve("images"), "*.{png}")) {
-            manager = new ConfigManager<Config>(TypeToken.of(Config.class), loader, Config::new);
-            for (Path path: stream) {
-                String name = path.getFileName().toString();
-                int pos = name.lastIndexOf(".");
-                if (pos > 0) name = name.substring(0, pos);
-                Wings.addWing(name, path.toString(), false);
-            }
-
-            Wings.addWing("basic", "basic.png", true);
-            Wings.addWing("dragon", "dragon.png", true);
+        setupWings();
+        try {
+            manager = new ConfigManager<>(TypeToken.of(Config.class), loader, Config::new);
         } catch (IOException | ObjectMappingException e) {
             e.printStackTrace();
         }
 
-        Map<List<String>, CommandSpec> subcommands = new HashMap<>();
+        CommandSpec spec;
 
-        subcommands.put(Lists.newArrayList("set"),
-                CommandSpec.builder()
-                        .arguments(new WingElement(Text.of("wing")))
-                        .permission("particlewings.command.wing")
-                        .executor((src, ctx) -> {
-                            Optional.of(src).map(s -> (Player) s).ifPresent(player -> {
-                                ctx.<String>getOne(Text.of("wing")).ifPresent(wing -> {
+        //if(manager.getConfig().useGui && Sponge.getPluginManager().isLoaded("huskyui")) {
+        //    spec = CommandSpec.builder().build();
+        //} else {
+            Map<List<String>, CommandSpec> subcommands = new HashMap<>();
+            subcommands.put(Lists.newArrayList("deactivate"),
+                    CommandSpec.builder()
+                            .permission("particlewings.command.use")
+                            .executor((src, ctx) -> {
+                                Optional.of(src).map(s -> (Player) s).ifPresent(player -> {
                                     Optional<WingEffect> effect = Optional.ofNullable(effects.get(player.getUniqueId()));
 
                                     if(effect.isPresent()) {
-                                        if(effect.get().getWing().equals(wing)) {
-                                            player.sendMessage(Text.of("Wings already set to " + wing));
-                                            return;
-                                        }
-                                        effect.get().setWing(wing);
+                                        effects.get(player.getUniqueId()).cancel();
+                                        effects.remove(player.getUniqueId());
+                                        player.sendMessage(Text.of("Wings deactivated"));
                                     } else {
-                                        WingEffect wingEffect = new WingEffect(wing, player);
-                                        effects.put(player.getUniqueId(), wingEffect);
-                                        Sponge.getScheduler().createTaskBuilder().intervalTicks(manager.getConfig().interval).execute(wingEffect).submit(this);
+                                        player.sendMessage(Text.of("Wings already inactive."));
                                     }
-
-                                    player.sendMessage(Text.of("Wings set to " + wing));
                                 });
-                            });
 
-                            return CommandResult.success();
-                        }).build());
+                                return CommandResult.success();
+                            }).build());
 
-        subcommands.put(Lists.newArrayList("remove"),
-                CommandSpec.builder()
-                        .permission("particlewings.command.remove")
-                        .executor((src, ctx) -> {
-                            Optional.of(src).map(s -> (Player) s).ifPresent(player -> {
+            spec = CommandSpec.builder()
+                    .arguments(new WingElement(Text.of("wing")))
+                    .permission("particlewings.command.use")
+                    .executor((src, ctx) -> {
+                        Optional.of(src).map(s -> (Player) s).ifPresent(player -> {
+                            ctx.<Wing>getOne(Text.of("wing")).ifPresent(wing -> {
                                 Optional<WingEffect> effect = Optional.ofNullable(effects.get(player.getUniqueId()));
-
                                 if(effect.isPresent()) {
-                                    effects.remove(player.getUniqueId());
-                                    player.sendMessage(Text.of("Wings removed"));
+                                    if(effect.get().getWing().equals(wing)) {
+                                        effects.get(player.getUniqueId()).cancel();
+                                        effects.remove(player.getUniqueId());
+                                        player.sendMessage(Text.of("Wings deactivated"));
+                                    } else {
+                                        effect.get().setWing(wing);
+                                    }
                                 } else {
-                                    player.sendMessage(Text.of("Wings already removed"));
+                                    WingEffect wingEffect = new WingEffect(wing, player);
+                                    effects.put(player.getUniqueId(), wingEffect);
+                                    Sponge.getScheduler().createTaskBuilder().intervalTicks(manager.getConfig().interval).execute(wingEffect).submit(this);
                                 }
+
+                                player.sendMessage(Text.of("Wings set to " + wing));
                             });
+                        });
+                        return CommandResult.success();
+                    })
+                    .children(subcommands)
+                    .build();
+        //}
 
-                            return CommandResult.success();
-                        }).build());
-
-        Sponge.getCommandManager().register(this, CommandSpec.builder().children(subcommands).build(), "particlewings", "pw");
+        Sponge.getCommandManager().register(this, spec, "particlewings", "pw");
     }
 
+    private void setupWings() {
+        Path directory = dir.resolve("wings");
+        if (!directory.toFile().exists()) {
+            directory.toFile().mkdir();
+        }
+
+        try(DirectoryStream<Path> stream = Files.newDirectoryStream(directory, "*.{zip}")) {
+            for (Path path : stream) {
+                String name = path.getFileName().toString();
+                int pos = name.lastIndexOf(".");
+                if (pos > 0) name = name.substring(0, pos);
+                System.out.println(path.toAbsolutePath());
+                Wings.addWing(name, path.toAbsolutePath().toString());
+            }
+        } catch  (IOException e) {
+            logger.error("Directory couldn't be created");
+        }
+    }
+
+    public static PluginContainer getContainer() {
+        return container;
+    }
 }

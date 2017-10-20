@@ -23,14 +23,11 @@ import java.util.Optional;
 import java.util.function.Consumer;
 
 class WingEffect implements Consumer<Task> {
-    private static Matrix4d right = Matrix4d.createRotation(Quaterniond.fromAxesAnglesDeg(0,135,0)).translate(Vector3d.RIGHT.mul(0.25).negate().add(0,1,-0.25));
-    private static Matrix4d left = Matrix4d.createRotation(Quaterniond.fromAxesAnglesDeg(0, 45,0)).translate(Vector3d.RIGHT.mul(0.25).add(0,1,-0.25));
-
-    private String wing;
+    private Wing wing;
     private Player player;
     private boolean cancel = false;
 
-    WingEffect(String wing, Player player) {
+    WingEffect(Wing wing, Player player) {
         this.wing = wing;
         this.player = player;
     }
@@ -42,22 +39,18 @@ class WingEffect implements Consumer<Task> {
             return;
         }
 
-        Texture texture = Wings.getWing(wing);
-        Transform<World> transform = player.getTransform().setRotation(new Vector3d(0, player.getTransform().getYaw(), 0));
-
-        texture.draw(player.getWorld(), right, transform.toMatrix());
-        texture.draw(player.getWorld(), left, transform.toMatrix());
+        wing.render(player, player.getTransform());
     }
 
     public void cancel() {
         cancel = true;
     }
 
-    public void setWing(String wing) {
+    public void setWing(Wing wing) {
         this.wing = wing;
     }
 
-    public String getWing() {
+    public Wing getWing() {
         return wing;
     }
 }

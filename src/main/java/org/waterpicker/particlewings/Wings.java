@@ -1,38 +1,70 @@
 package org.waterpicker.particlewings;
 
-import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
-import java.io.File;
 import java.io.IOException;
-import java.net.URL;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.zip.ZipFile;
+
+import static org.waterpicker.particlewings.IOUtil.*;
 
 public class Wings {
-    private static Map<String, Texture> textures = new HashMap<>();
 
-    public static void addWing(String name, String file, boolean isInJar) throws IOException {
-        loadImage(file, isInJar).map(Texture::new).ifPresent(texture -> {
-            textures.put(name, texture);
+
+    private static Map<String, Wing> wings = new HashMap<>();
+
+    public static void addWing(String file) throws IOException {
+        addWing(file.split(".")[0], file, true);
+    }
+
+    public static void addWing(String name, String file) throws IOException {
+        addWing(name, file, false);
+    }
+
+    private static void addWing(String name, String file, boolean isInJar) throws IOException {
+        loadWing(name, file, isInJar).ifPresent(texture -> {
+            wings.put(name, texture);
         });
     }
 
-    public static Texture getWing(String name) {
-        return textures.get(name);
+    private static Optional<Wing> loadWing(String name, String file, boolean isInJar) {
+        Optional<ZipFile> zip = loadZip(file, isInJar);
+
+        if(zip.isPresent()) {
+            Optional<BufferedImage> left = loadImage(zip.get(), "left.png");
+            Optional<BufferedImage> right = loadImage(zip.get(), "right.png");
+
+            if(left.isPresent() && right.isPresent()) {
+                return Optional.of(new Wing(name, left.get(), right.get()));
+            } else {
+                System.out.println("Wing " + name + " wasn't created.");
+                return Optional.empty();
+            }
+        } else {
+            return Optional.empty();
+        }
     }
 
-    private static Optional<BufferedImage> loadImage(String file, boolean isInJar) throws IOException {
-        BufferedImage buff = null;
+    private static Optional<ZipFile> loadZip(String file, boolean isInJar) {
+        if(isInJar) {
+            return zip.apply(ParticleWings.getContainer().getAsset(file).map(a -> a.getUrl().getPath()).orElse(null));
+        } else {
+            return zip.apply(file);
+        }
+    }
 
-        if(isInJar) buff = ImageIO.read(ParticleWings.class.getResource("/" + file));
-        else buff = ImageIO.read(new File(file));
+    public static Wing getWing(String name) {
+        return wings.get(name);
+    }
 
-        return Optional.ofNullable(buff);
+    private static Optional<BufferedImage> loadImage(ZipFile zipFile, String file){
+        return image.apply(intputStream.apply(zipFile, entry.apply(zipFile, file).orElse(null)).orElse(null));
+
     }
 
     public static Set<String> getAvailableWings() {
-        return textures.keySet();
+        return wings.keySet();
     }
 }

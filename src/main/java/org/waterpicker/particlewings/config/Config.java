@@ -14,4 +14,7 @@ import java.util.Optional;
 public class Config {
     @Setting(value = "update interval", comment = "Ticks between effect update:")
     public Integer interval = 5;
+
+    @Setting(value = "use gui", comment = "Should GUI instead of command be used")
+    public Boolean useGui = false;
 }

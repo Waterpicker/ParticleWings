@@ -5,8 +5,14 @@ plugins {
 group = pluginGroup
 version = pluginVersion
 
+repositories {
+    maven { url 'https://jitpack.io' }
+}
+
 dependencies {
     compile 'org.spongepowered:spongeapi:6.0.0'
+    compile 'com.github.codeHusky:HuskyUI-Plugin:v0.3.1'
+
 }
 
 sponge.plugin.id = pluginId
