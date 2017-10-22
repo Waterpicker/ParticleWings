@@ -18,7 +18,9 @@ import org.spongepowered.api.config.ConfigDir;
 import org.spongepowered.api.config.DefaultConfig;
 import org.spongepowered.api.entity.living.player.Player;
 import org.spongepowered.api.event.Listener;
+import org.spongepowered.api.event.entity.DestructEntityEvent;
 import org.spongepowered.api.event.game.state.GamePreInitializationEvent;
+import org.spongepowered.api.event.network.ClientConnectionEvent;
 import org.spongepowered.api.plugin.Plugin;
 import org.spongepowered.api.plugin.PluginContainer;
 import org.spongepowered.api.text.Text;
@@ -47,7 +49,7 @@ public class ParticleWings {
 
     private static PluginContainer container;
 
-    private Map<UUID, WingEffect> effects = new HashMap<>();
+    private Map<UUID, Wing> effects = new HashMap<>();
 
     @Inject
     @ConfigDir(sharedRoot = false)
@@ -67,68 +69,70 @@ public class ParticleWings {
     @Listener
     public void onPreInit(GamePreInitializationEvent event) {
         setupWings();
+
         try {
             manager = new ConfigManager<>(TypeToken.of(Config.class), loader, Config::new);
         } catch (IOException | ObjectMappingException e) {
             e.printStackTrace();
         }
 
-        CommandSpec spec;
+        Map<List<String>, CommandSpec> subcommands = new HashMap<>();
+        subcommands.put(Lists.newArrayList("deactivate"),
+                CommandSpec.builder()
+                        .permission("particlewings.command.use")
+                        .executor((src, ctx) -> {
+                            Optional.of(src).map(s -> (Player) s).ifPresent(player -> {
+                                Optional<Wing> effect = Optional.ofNullable(effects.get(player.getUniqueId()));
 
-        //if(manager.getConfig().useGui && Sponge.getPluginManager().isLoaded("huskyui")) {
-        //    spec = CommandSpec.builder().build();
-        //} else {
-            Map<List<String>, CommandSpec> subcommands = new HashMap<>();
-            subcommands.put(Lists.newArrayList("deactivate"),
-                    CommandSpec.builder()
-                            .permission("particlewings.command.use")
-                            .executor((src, ctx) -> {
-                                Optional.of(src).map(s -> (Player) s).ifPresent(player -> {
-                                    Optional<WingEffect> effect = Optional.ofNullable(effects.get(player.getUniqueId()));
-
-                                    if(effect.isPresent()) {
-                                        effects.get(player.getUniqueId()).cancel();
-                                        effects.remove(player.getUniqueId());
-                                        player.sendMessage(Text.of("Wings deactivated"));
-                                    } else {
-                                        player.sendMessage(Text.of("Wings already inactive."));
-                                    }
-                                });
-
-                                return CommandResult.success();
-                            }).build());
-
-            spec = CommandSpec.builder()
-                    .arguments(new WingElement(Text.of("wing")))
-                    .permission("particlewings.command.use")
-                    .executor((src, ctx) -> {
-                        Optional.of(src).map(s -> (Player) s).ifPresent(player -> {
-                            ctx.<Wing>getOne(Text.of("wing")).ifPresent(wing -> {
-                                Optional<WingEffect> effect = Optional.ofNullable(effects.get(player.getUniqueId()));
                                 if(effect.isPresent()) {
-                                    if(effect.get().getWing().equals(wing)) {
-                                        effects.get(player.getUniqueId()).cancel();
-                                        effects.remove(player.getUniqueId());
-                                        player.sendMessage(Text.of("Wings deactivated"));
-                                    } else {
-                                        effect.get().setWing(wing);
-                                    }
+                                    effects.remove(player.getUniqueId());
+                                    player.sendMessage(Text.of("Wings deactivated"));
                                 } else {
-                                    WingEffect wingEffect = new WingEffect(wing, player);
-                                    effects.put(player.getUniqueId(), wingEffect);
-                                    Sponge.getScheduler().createTaskBuilder().intervalTicks(manager.getConfig().interval).execute(wingEffect).submit(this);
+                                    player.sendMessage(Text.of("Wings already inactive."));
                                 }
-
-                                player.sendMessage(Text.of("Wings set to " + wing));
                             });
+
+                            return CommandResult.success();
+                        }).build());
+
+        CommandSpec spec = CommandSpec.builder()
+                .arguments(new WingElement(Text.of("wing")))
+                .permission("particlewings.command.use")
+                .executor((src, ctx) -> {
+                    Optional.of(src).map(s -> (Player) s).ifPresent(player -> {
+                        ctx.<Wing>getOne(Text.of("wing")).ifPresent(wing -> {
+                            Optional<Wing> effect = Optional.ofNullable(effects.get(player.getUniqueId()));
+                            if(effect.isPresent()) {
+                                if(effect.get().equals(wing)) {
+                                    effects.remove(player.getUniqueId());
+                                    player.sendMessage(Text.of("Wings deactivated"));
+                                } else {
+                                    effects.put(player.getUniqueId(), wing);
+                                    player.sendMessage(Text.of("Wings set to " + wing));
+                                }
+                            } else {
+                                effects.put(player.getUniqueId(), wing);
+                                player.sendMessage(Text.of("Wings set to " + wing));
+                            }
                         });
-                        return CommandResult.success();
-                    })
-                    .children(subcommands)
-                    .build();
-        //}
+                    });
+                    return CommandResult.success();
+                })
+                .children(subcommands)
+                .build();
 
         Sponge.getCommandManager().register(this, spec, "particlewings", "pw");
+
+        Sponge.getScheduler().createTaskBuilder().intervalTicks(manager.getConfig().interval).execute((task) -> {
+            effects.forEach((uuid, wing) -> {
+                Sponge.getServer().getPlayer(uuid).ifPresent(player -> wing.render(player.getWorld(), player.getTransform()));
+            });
+        }).submit(this);
+    }
+
+    @Listener
+    public void onLogOff(ClientConnectionEvent.Disconnect event) {
+        effects.remove(event.getTargetEntity().getUniqueId());
     }
 
     private void setupWings() {

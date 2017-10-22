@@ -22,6 +22,7 @@ public class IOUtil {
             return Optional.of(FileSystems.newFileSystem(URI.create("jar:file:" + path), new HashMap<>()));
         } catch (NullPointerException | IOException e) {
             System.out.println(path + " not found and triggered the " + e.getClass().getSimpleName());
+            e.printStackTrace();
             return Optional.empty();
         }
     };
@@ -32,6 +33,7 @@ public class IOUtil {
             return Optional.of(ImageIO.read(Files.newInputStream(path)));
         } catch (NullPointerException | IOException e) {
             System.out.println("Path couldn't be converted to BufferedImage.");
+            e.printStackTrace();
             return Optional.empty();
         }
     };

@@ -39,7 +39,11 @@ class WingEffect implements Consumer<Task> {
             return;
         }
 
-        wing.render(player, player.getTransform());
+        wing.render(player.getWorld(), player.getTransform());
+    }
+
+    public void setPlayer(Player player) {
+        this.player = player;
     }
 
     public void cancel() {
