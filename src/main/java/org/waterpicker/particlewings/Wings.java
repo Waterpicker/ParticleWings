@@ -1,7 +1,10 @@
 package org.waterpicker.particlewings;
 
+import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
+import java.nio.file.FileSystem;
+import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -30,9 +33,15 @@ public class Wings {
     }
 
     private static Optional<Wing> loadWing(String name, String file, boolean isInJar) {
-        Optional<ZipFile> zip = loadZip(file, isInJar);
+        Optional<FileSystem> zip = loadZip(file, isInJar);
 
         if(zip.isPresent()) {
+            Optional<BufferedImage> both = loadImage(zip.get(), "both.png");
+
+            if(both.isPresent()) {
+                return Optional.of(new Wing(name, both.get(), both.get()));
+            }
+
             Optional<BufferedImage> left = loadImage(zip.get(), "left.png");
             Optional<BufferedImage> right = loadImage(zip.get(), "right.png");
 
@@ -47,7 +56,7 @@ public class Wings {
         }
     }
 
-    private static Optional<ZipFile> loadZip(String file, boolean isInJar) {
+    private static Optional<FileSystem> loadZip(String file, boolean isInJar) {
         if(isInJar) {
             return zip.apply(ParticleWings.getContainer().getAsset(file).map(a -> a.getUrl().getPath()).orElse(null));
         } else {
@@ -59,8 +68,10 @@ public class Wings {
         return wings.get(name);
     }
 
-    private static Optional<BufferedImage> loadImage(ZipFile zipFile, String file){
-        return image.apply(intputStream.apply(zipFile, entry.apply(zipFile, file).orElse(null)).orElse(null));
+    private static Optional<BufferedImage> loadImage(FileSystem system, String file){
+        Path path = system.getPath("/" + file);
+        System.out.println(path);
+        return image.apply(path);
 
     }
 
