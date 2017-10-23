@@ -17,4 +17,7 @@ public class Config {
 
     @Setting(value = "use gui", comment = "Should GUI instead of command be used")
     public Boolean useGui = false;
+
+    @Setting(value = "enable flight with wings")
+    public Boolean enableFlight = false;
 }

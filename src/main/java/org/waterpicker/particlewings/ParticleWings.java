@@ -1,24 +1,20 @@
 package org.waterpicker.particlewings;
 
-import com.codehusky.huskyui.StateContainer;
 import com.google.common.collect.Lists;
 import com.google.common.reflect.TypeToken;
 import com.google.inject.Inject;
 import ninja.leaping.configurate.commented.CommentedConfigurationNode;
-import ninja.leaping.configurate.hocon.HoconConfigurationLoader;
 import ninja.leaping.configurate.loader.ConfigurationLoader;
 import ninja.leaping.configurate.objectmapping.ObjectMappingException;
 import org.slf4j.Logger;
 import org.spongepowered.api.Sponge;
 import org.spongepowered.api.command.CommandResult;
-import org.spongepowered.api.command.args.GenericArguments;
-import org.spongepowered.api.command.spec.CommandExecutor;
 import org.spongepowered.api.command.spec.CommandSpec;
 import org.spongepowered.api.config.ConfigDir;
 import org.spongepowered.api.config.DefaultConfig;
+import org.spongepowered.api.data.key.Keys;
 import org.spongepowered.api.entity.living.player.Player;
 import org.spongepowered.api.event.Listener;
-import org.spongepowered.api.event.entity.DestructEntityEvent;
 import org.spongepowered.api.event.game.state.GamePreInitializationEvent;
 import org.spongepowered.api.event.network.ClientConnectionEvent;
 import org.spongepowered.api.plugin.Plugin;
@@ -86,6 +82,7 @@ public class ParticleWings {
 
                                 if(effect.isPresent()) {
                                     effects.remove(player.getUniqueId());
+                                    setFlight(player, false);
                                     player.sendMessage(Text.of("Wings deactivated"));
                                 } else {
                                     player.sendMessage(Text.of("Wings already inactive."));
@@ -105,13 +102,16 @@ public class ParticleWings {
                             if(effect.isPresent()) {
                                 if(effect.get().equals(wing)) {
                                     effects.remove(player.getUniqueId());
+                                    setFlight(player, false);
                                     player.sendMessage(Text.of("Wings deactivated"));
                                 } else {
                                     effects.put(player.getUniqueId(), wing);
+                                    setFlight(player, true);
                                     player.sendMessage(Text.of("Wings set to " + wing));
                                 }
                             } else {
                                 effects.put(player.getUniqueId(), wing);
+                                setFlight(player, true);
                                 player.sendMessage(Text.of("Wings set to " + wing));
                             }
                         });
@@ -125,7 +125,7 @@ public class ParticleWings {
 
         Sponge.getScheduler().createTaskBuilder().intervalTicks(manager.getConfig().interval).execute((task) -> {
             effects.forEach((uuid, wing) -> {
-                Sponge.getServer().getPlayer(uuid).ifPresent(player -> wing.render(player.getWorld(), player.getTransform()));
+                Sponge.getServer().getPlayer(uuid).filter(ParticleWings::isInvisble).ifPresent(player -> wing.render(player.getWorld(), player.getTransform()));
             });
         }).submit(this);
     }
@@ -156,5 +156,15 @@ public class ParticleWings {
 
     public static PluginContainer getContainer() {
         return container;
+    }
+
+    public static boolean isInvisble(Player player) {
+        return !(player.get(Keys.INVISIBLE).orElse(false) || player.get(Keys.VANISH).orElse(false));
+    }
+
+    public void setFlight(Player player, boolean value) {
+        if(Sponge.getPluginManager().isLoaded("nucleus") && player.hasPermission("particlewings.flight"))
+            Sponge.getCommandManager().process(Sponge.getServer().getConsole(), "fly " + player.getName() + " " + value);
+
     }
 }

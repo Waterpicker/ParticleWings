@@ -52,6 +52,7 @@ public class Wings {
                 return Optional.empty();
             }
         } else {
+            System.out.println("Wing " + name + " wasn't created.");
             return Optional.empty();
         }
     }
@@ -70,7 +71,6 @@ public class Wings {
 
     private static Optional<BufferedImage> loadImage(FileSystem system, String file){
         Path path = system.getPath("/" + file);
-        System.out.println(path);
         return image.apply(path);
 
     }
