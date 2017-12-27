@@ -3,6 +3,7 @@ package org.waterpicker.particlewings;
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
+import java.net.URI;
 import java.nio.file.FileSystem;
 import java.nio.file.Path;
 import java.util.HashMap;
@@ -18,21 +19,21 @@ public class Wings {
 
     private static Map<String, Wing> wings = new HashMap<>();
 
-    public static void addWing(String file) throws IOException {
+    /*public static void addWing(URI file) throws IOException {
         addWing(file.split(".")[0], file, true);
-    }
+    }*/
 
-    public static void addWing(String name, String file) throws IOException {
+    public static void addWing(String name, URI file) throws IOException {
         addWing(name, file, false);
     }
 
-    private static void addWing(String name, String file, boolean isInJar) throws IOException {
+    private static void addWing(String name, URI file, boolean isInJar) throws IOException {
         loadWing(name, file, isInJar).ifPresent(texture -> {
             wings.put(name, texture);
         });
     }
 
-    private static Optional<Wing> loadWing(String name, String file, boolean isInJar) {
+    private static Optional<Wing> loadWing(String name, URI file, boolean isInJar) {
         Optional<FileSystem> zip = loadZip(file, isInJar);
 
         if(zip.isPresent()) {
@@ -57,12 +58,8 @@ public class Wings {
         }
     }
 
-    private static Optional<FileSystem> loadZip(String file, boolean isInJar) {
-        if(isInJar) {
-            return zip.apply(ParticleWings.getContainer().getAsset(file).map(a -> a.getUrl().getPath()).orElse(null));
-        } else {
-            return zip.apply(file);
-        }
+    private static Optional<FileSystem> loadZip(URI file, boolean isInJar) {
+        return zip.apply(file);
     }
 
     public static Wing getWing(String name) {

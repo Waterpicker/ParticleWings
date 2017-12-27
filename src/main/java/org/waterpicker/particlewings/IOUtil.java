@@ -5,6 +5,7 @@ import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.nio.file.FileSystem;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
@@ -17,10 +18,11 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
 public class IOUtil {
-    public static Function<String, Optional<FileSystem>> zip = (path) -> {
+    public static Function<URI, Optional<FileSystem>> zip = (path) -> {
         try {
-            return Optional.of(FileSystems.newFileSystem(URI.create(("jar:file:" + path).replace(" ", "%20")), new HashMap<>()));
+            return Optional.of(FileSystems.newFileSystem(URI.create("jar:" + path.toString()), new HashMap<>()));
         } catch (NullPointerException | IOException e) {
+            e.printStackTrace();
             return Optional.empty();
         }
     };

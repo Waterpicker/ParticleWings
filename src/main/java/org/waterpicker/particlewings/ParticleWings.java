@@ -62,6 +62,10 @@ public class ParticleWings {
         ParticleWings.container = container;
     }
 
+    private int count = 0;
+
+    private boolean isDisabled = false;
+
     @Listener
     public void onPreInit(GamePreInitializationEvent event) {
         setupWings();
@@ -82,7 +86,6 @@ public class ParticleWings {
 
                                 if(effect.isPresent()) {
                                     effects.remove(player.getUniqueId());
-                                    setFlight(player, false);
                                     player.sendMessage(Text.of("Wings deactivated"));
                                 } else {
                                     player.sendMessage(Text.of("Wings already inactive."));
@@ -91,6 +94,21 @@ public class ParticleWings {
 
                             return CommandResult.success();
                         }).build());
+
+        subcommands.put(Lists.newArrayList("disable"),
+                CommandSpec.builder()
+                        .permission("particlewings.command.disable")
+                        .executor((src, ctx) -> {
+                            isDisabled = !isDisabled;
+
+                            if (isDisabled) {
+                                Sponge.getServer().getBroadcastChannel().send(Text.of("Wings are now disabled."));
+                                effects.clear();
+                            } else Sponge.getServer().getBroadcastChannel().send(Text.of("Wings are now enabled"));
+
+                            return CommandResult.success();
+                        })
+                        .build());
 
         CommandSpec spec = CommandSpec.builder()
                 .arguments(new WingElement(Text.of("wing")))
@@ -102,17 +120,12 @@ public class ParticleWings {
                             if(effect.isPresent()) {
                                 if(effect.get().equals(wing)) {
                                     effects.remove(player.getUniqueId());
-                                    setFlight(player, false);
                                     player.sendMessage(Text.of("Wings deactivated"));
                                 } else {
-                                    effects.put(player.getUniqueId(), wing);
-                                    setFlight(player, true);
-                                    player.sendMessage(Text.of("Wings set to " + wing));
+                                    changeWing(player, wing);
                                 }
                             } else {
-                                effects.put(player.getUniqueId(), wing);
-                                setFlight(player, true);
-                                player.sendMessage(Text.of("Wings set to " + wing));
+                                changeWing(player, wing);
                             }
                         });
                     });
@@ -122,12 +135,29 @@ public class ParticleWings {
                 .build();
 
         Sponge.getCommandManager().register(this, spec, "particlewings", "pw");
+    }
 
-        Sponge.getScheduler().createTaskBuilder().intervalTicks(manager.getConfig().interval).execute((task) -> {
-            effects.forEach((uuid, wing) -> {
-                Sponge.getServer().getPlayer(uuid).filter(ParticleWings::isInvisble).ifPresent(player -> wing.render(player.getWorld(), player.getTransform()));
-            });
-        }).submit(this);
+    private void changeWing(Player player, Wing wing) {
+        if(isDisabled) {
+            if (effects.isEmpty()) {
+                Sponge.getScheduler().createTaskBuilder().async().intervalTicks(manager.getConfig().interval).execute((task) -> {
+                    if (effects.isEmpty()) {
+                        task.cancel();
+                        return;
+                    }
+
+                    effects.forEach((uuid, w) -> {
+                        Sponge.getServer().getPlayer(uuid).filter(ParticleWings::isInvisble).ifPresent(p -> w.render(p.getWorld(), p.getTransform()));
+                    });
+                    Wing.increment();
+                }).submit(this);
+            }
+
+            effects.put(player.getUniqueId(), wing);
+            player.sendMessage(Text.of("Wings set to " + wing));
+        } else {
+            player.sendMessage(Text.of("Wings are currently disabled."));
+        }
     }
 
     @Listener
@@ -147,7 +177,7 @@ public class ParticleWings {
                 int pos = name.lastIndexOf(".");
                 if (pos > 0) name = name.substring(0, pos);
                 System.out.println(path.toAbsolutePath());
-                Wings.addWing(name, path.toAbsolutePath().toString());
+                Wings.addWing(name, path.toUri());
             }
         } catch  (IOException e) {
             logger.error("Directory couldn't be created");
@@ -160,11 +190,5 @@ public class ParticleWings {
 
     public static boolean isInvisble(Player player) {
         return !(player.get(Keys.INVISIBLE).orElse(false) || player.get(Keys.VANISH).orElse(false));
-    }
-
-    public void setFlight(Player player, boolean value) {
-        if(Sponge.getPluginManager().isLoaded("nucleus") && player.hasPermission("particlewings.flight"))
-            Sponge.getCommandManager().process(Sponge.getServer().getConsole(), "fly " + player.getName() + " " + value);
-
     }
 }
