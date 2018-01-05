@@ -1,5 +1,6 @@
 package org.waterpicker.particlewings;
 
+import com.flowpowered.math.matrix.Matrix4d;
 import com.google.common.collect.Lists;
 import com.google.common.reflect.TypeToken;
 import com.google.inject.Inject;
@@ -20,6 +21,8 @@ import org.spongepowered.api.event.network.ClientConnectionEvent;
 import org.spongepowered.api.plugin.Plugin;
 import org.spongepowered.api.plugin.PluginContainer;
 import org.spongepowered.api.text.Text;
+import org.spongepowered.api.world.Location;
+import org.spongepowered.api.world.World;
 import org.waterpicker.particlewings.config.Config;
 import org.waterpicker.particlewings.config.ConfigManager;
 
@@ -138,7 +141,7 @@ public class ParticleWings {
     }
 
     private void changeWing(Player player, Wing wing) {
-        if(isDisabled) {
+        if(!isDisabled) {
             if (effects.isEmpty()) {
                 Sponge.getScheduler().createTaskBuilder().async().intervalTicks(manager.getConfig().interval).execute((task) -> {
                     if (effects.isEmpty()) {
@@ -146,10 +149,10 @@ public class ParticleWings {
                         return;
                     }
 
+                    Wings.increment();
                     effects.forEach((uuid, w) -> {
                         Sponge.getServer().getPlayer(uuid).filter(ParticleWings::isInvisble).ifPresent(p -> w.render(p.getWorld(), p.getTransform()));
                     });
-                    Wing.increment();
                 }).submit(this);
             }
 
@@ -157,6 +160,7 @@ public class ParticleWings {
             player.sendMessage(Text.of("Wings set to " + wing));
         } else {
             player.sendMessage(Text.of("Wings are currently disabled."));
+            effects.clear();
         }
     }
 
@@ -176,7 +180,6 @@ public class ParticleWings {
                 String name = path.getFileName().toString();
                 int pos = name.lastIndexOf(".");
                 if (pos > 0) name = name.substring(0, pos);
-                System.out.println(path.toAbsolutePath());
                 Wings.addWing(name, path.toUri());
             }
         } catch  (IOException e) {
